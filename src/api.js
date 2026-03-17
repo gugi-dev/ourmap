@@ -45,3 +45,20 @@ export function clearVisits(profileId) {
     method: 'DELETE',
   })
 }
+
+export function getMemories(countryCode) {
+  return request(`/memories/${countryCode}`)
+}
+
+export function addMemory(countryCode, imageUrl, caption) {
+  return request(`/memories/${countryCode}`, {
+    method: 'POST',
+    body: JSON.stringify({ image_url: imageUrl, caption }),
+  })
+}
+
+export function deleteMemory(id) {
+  return request(`/memories/${id}`, {
+    method: 'DELETE',
+  })
+}
