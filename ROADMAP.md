@@ -13,18 +13,20 @@
 - [x] Docker + Render deployment
 - [x] In-memory store (works without DB)
 
-## Phase 2 — Persistence
-- [ ] Neon PostgreSQL integration
-- [ ] Save traveler names + emoji
-- [ ] Save visited countries per profile
+## Phase 2 — Persistence (Done)
+- [x] Neon PostgreSQL integration
+- [x] Save traveler names + emoji
+- [x] Save visited countries per profile
+- [x] Data survives restarts
 - [ ] Trip dates (when did you visit — date picker)
-- [ ] Data survives restarts
 
-## Phase 3 — Memories
-- [ ] Photos per country (upload + gallery)
+## Phase 3 — Memories (In Progress)
+- [x] Photos per country (URL-only, gallery + lightbox)
+- [x] Camera bubble markers on map for countries with memories
+- [x] Google Drive / Dropbox URL auto-conversion
+- [x] Click visited country on map → opens memories
 - [ ] Notes / journal entries per country
 - [ ] "Our story" — shared timeline of travels
-- [ ] Click a country on the map → see your photos + notes
 
 ## Phase 4 — Goals & Countdown
 - [ ] Birthday input per profile
@@ -45,6 +47,13 @@
 - [ ] Budget tracker per trip
 - [ ] Packing checklist
 - [ ] Auto-mark country as visited after trip date passes
+
+## Small Improvements Backlog
+- [ ] More tiny country markers (Singapore, Bahrain, etc.)
+- [ ] Circle markers for all island nations
+- [ ] Remove unused components (BottomDrawer.vue, CountrySidebar.vue)
+- [ ] Add notes field to memories
+- [ ] Image upload to cloud storage (alternative to URL-only)
 
 ## Future Ideas
 - [ ] Share a trip plan via link
