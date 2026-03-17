@@ -2,16 +2,18 @@ import dotenv from 'dotenv'
 
 dotenv.config()
 
-const useMemory = !process.env.DATABASE_URL
+// Only use PostgreSQL if DATABASE_URL is explicitly set and looks valid
+const dbUrl = process.env.DATABASE_URL
+let useMemory = !dbUrl || !dbUrl.startsWith('postgres')
 
-// ── In-memory store (no DB needed for local dev) ──
+// ── In-memory store (no DB needed for MVP) ──
 
 const mem = {
   profiles: [
     { id: 1, name: 'Traveler 1', emoji: '🧑', created_at: new Date().toISOString() },
     { id: 2, name: 'Traveler 2', emoji: '👩', created_at: new Date().toISOString() },
   ],
-  visits: [], // { id, profile_id, country_code, country_name, visited_at }
+  visits: [],
   nextVisitId: 1,
 }
 
@@ -59,22 +61,30 @@ const memoryDb = {
   },
 }
 
-// ── PostgreSQL (production / when DATABASE_URL is set) ──
+// ── PostgreSQL (when DATABASE_URL is set) ──
 
 let pool = null
 
 if (!useMemory) {
-  const pg = await import('pg')
-  const { Pool } = pg.default
-  pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DATABASE_URL.includes('neon') ? { rejectUnauthorized: true } : undefined,
-  })
+  try {
+    const pg = await import('pg')
+    const { Pool } = pg.default
+    pool = new Pool({
+      connectionString: dbUrl,
+      ssl: { rejectUnauthorized: false },
+    })
+    // Test the connection
+    await pool.query('SELECT 1')
+  } catch (e) {
+    console.warn('PostgreSQL connection failed, falling back to in-memory:', e.message)
+    useMemory = true
+    pool = null
+  }
 }
 
 export async function initDb() {
   if (useMemory) {
-    console.log('No DATABASE_URL found — using in-memory store (data resets on restart)')
+    console.log('Using in-memory store (data resets on restart)')
     return
   }
   await pool.query(`
@@ -96,6 +106,7 @@ export async function initDb() {
     VALUES (1, 'Traveler 1', '🧑'), (2, 'Traveler 2', '👩')
     ON CONFLICT (id) DO NOTHING;
   `)
+  console.log('PostgreSQL connected and initialized')
 }
 
 export function query(text, params) {
