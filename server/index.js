@@ -111,6 +111,63 @@ app.delete('/api/profiles/:id/visits', async (req, res) => {
   }
 })
 
+// --- Memories ---
+
+app.get('/api/memories', async (req, res) => {
+  try {
+    if (useMemory) return res.json(memoryDb.getMemoryCountries())
+    const { rows } = await query(
+      'SELECT country_code, COUNT(*)::int AS count FROM memories GROUP BY country_code'
+    )
+    res.json(rows)
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+app.get('/api/memories/:countryCode', async (req, res) => {
+  try {
+    if (useMemory) return res.json(memoryDb.getMemories(req.params.countryCode))
+    const { rows } = await query(
+      'SELECT * FROM memories WHERE country_code = $1 ORDER BY created_at DESC',
+      [req.params.countryCode]
+    )
+    res.json(rows)
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+app.post('/api/memories/:countryCode', async (req, res) => {
+  try {
+    const { image_url, caption } = req.body
+    if (!image_url) return res.status(400).json({ error: 'image_url required' })
+    if (useMemory) {
+      return res.json(memoryDb.addMemory(req.params.countryCode, image_url, caption))
+    }
+    const { rows } = await query(
+      'INSERT INTO memories (country_code, image_url, caption) VALUES ($1, $2, $3) RETURNING *',
+      [req.params.countryCode, image_url, caption || '']
+    )
+    res.json(rows[0])
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
+app.delete('/api/memories/:id', async (req, res) => {
+  try {
+    if (useMemory) {
+      memoryDb.deleteMemory(Number(req.params.id))
+      return res.json({ ok: true })
+    }
+    await query('DELETE FROM memories WHERE id = $1', [req.params.id])
+    res.json({ ok: true })
+  } catch (e) {
+    res.status(500).json({ error: e.message })
+  }
+})
+
 // --- Static files (production) ---
 
 if (process.env.NODE_ENV === 'production') {

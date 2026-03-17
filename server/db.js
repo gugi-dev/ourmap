@@ -14,7 +14,9 @@ const mem = {
     { id: 2, name: 'Traveler 2', emoji: '👩', created_at: new Date().toISOString() },
   ],
   visits: [],
+  memories: [], // { id, country_code, image_url, caption, created_at }
   nextVisitId: 1,
+  nextMemoryId: 1,
 }
 
 const memoryDb = {
@@ -59,6 +61,32 @@ const memoryDb = {
   clearVisits(profileId) {
     mem.visits = mem.visits.filter(v => v.profile_id !== profileId)
   },
+  getMemories(countryCode) {
+    return mem.memories
+      .filter(m => m.country_code === countryCode)
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+  },
+  addMemory(countryCode, imageUrl, caption) {
+    const memory = {
+      id: mem.nextMemoryId++,
+      country_code: countryCode,
+      image_url: imageUrl,
+      caption: caption || '',
+      created_at: new Date().toISOString(),
+    }
+    mem.memories.push(memory)
+    return memory
+  },
+  deleteMemory(id) {
+    mem.memories = mem.memories.filter(m => m.id !== id)
+  },
+  getMemoryCountries() {
+    const counts = {}
+    for (const m of mem.memories) {
+      counts[m.country_code] = (counts[m.country_code] || 0) + 1
+    }
+    return Object.entries(counts).map(([country_code, count]) => ({ country_code, count }))
+  },
 }
 
 // ── PostgreSQL (when DATABASE_URL is set) ──
@@ -101,6 +129,13 @@ export async function initDb() {
       country_name VARCHAR(100) NOT NULL,
       visited_at TIMESTAMPTZ DEFAULT NOW(),
       UNIQUE(profile_id, country_code)
+    );
+    CREATE TABLE IF NOT EXISTS memories (
+      id SERIAL PRIMARY KEY,
+      country_code VARCHAR(10) NOT NULL,
+      image_url TEXT NOT NULL,
+      caption VARCHAR(255) DEFAULT '',
+      created_at TIMESTAMPTZ DEFAULT NOW()
     );
     INSERT INTO profiles (id, name, emoji)
     VALUES (1, 'Traveler 1', '🧑'), (2, 'Traveler 2', '👩')

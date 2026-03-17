@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { useVisitedCountries } from '../composables/useVisitedCountries.js'
 import { countryFlag } from '../utils/flags.js'
 import { continents, continentMap, countryToContinent } from '../data/continents.js'
+import CountryMemories from './CountryMemories.vue'
 
 const props = defineProps({
   mapRef: { type: Object, default: null },
@@ -64,6 +65,13 @@ function flyTo(e, country) {
     props.mapRef.flyToCountry(country.id)
   }
   emit('close')
+}
+
+const memoriesCountry = ref(null)
+
+function openMemories(e, country) {
+  e.stopPropagation()
+  memoriesCountry.value = country
 }
 </script>
 
@@ -128,6 +136,12 @@ function flyTo(e, country) {
           <span v-if="isVisitedBy(p1Id, country.id)" class="badge b-p1">&#10003;</span>
           <span v-if="isVisitedBy(p2Id, country.id)" class="badge b-p2">&#10003;</span>
         </div>
+        <button
+          v-if="getStatus(country.id) !== 'none'"
+          class="mem-btn"
+          @click="openMemories($event, country)"
+          title="Memories"
+        >&#128247;</button>
         <button class="fly-btn" @click="flyTo($event, country)" title="Fly to">
           <svg width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5">
             <circle cx="6" cy="6" r="4" /><circle cx="6" cy="6" r="1" fill="currentColor" />
@@ -135,6 +149,12 @@ function flyTo(e, country) {
         </button>
       </li>
     </ul>
+
+    <CountryMemories
+      v-if="memoriesCountry"
+      :country="memoriesCountry"
+      @close="memoriesCountry = null"
+    />
   </aside>
 </template>
 
@@ -263,6 +283,13 @@ function flyTo(e, country) {
 }
 .b-p1 { background: #dbeafe; color: #2563eb; }
 .b-p2 { background: #fce7f3; color: #db2777; }
+
+.mem-btn {
+  background: none; border: none;
+  cursor: pointer; padding: 0; font-size: 0.85rem;
+  opacity: 0.35; transition: opacity 0.15s; flex-shrink: 0;
+}
+.mem-btn:hover { opacity: 0.8; }
 
 .fly-btn {
   background: none; border: none; color: #e2e8f0;
