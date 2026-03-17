@@ -1,11 +1,14 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import LoginScreen from './components/LoginScreen.vue'
 import WorldMap from './components/WorldMap.vue'
 import SidePanel from './components/SidePanel.vue'
 import ProfileSelector from './components/ProfileSelector.vue'
 import GoalProgress from './components/GoalProgress.vue'
 import { useVisitedCountries } from './composables/useVisitedCountries.js'
 import { useConfetti } from './composables/useConfetti.js'
+
+const authenticated = ref(localStorage.getItem('ourmap-auth') === 'true')
 
 const {
   profiles, activeProfileId, visitedCount,
@@ -37,7 +40,8 @@ watch(visitedCount, (newVal, oldVal) => {
 </script>
 
 <template>
-  <div class="app">
+  <LoginScreen v-if="!authenticated" @authenticated="authenticated = true" />
+  <div v-else class="app">
     <header>
       <button v-if="isMobile" class="menu-btn" @click="menuOpen = true">
         <svg width="22" height="22" viewBox="0 0 22 22" fill="currentColor">
