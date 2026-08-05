@@ -1,3 +1,9 @@
+@import './styles/tokens.css';
+
+/* Variable Inter, self-hosted — no CDN request. The variable axis is what lets the
+ * tight heading tracking and tabular figures actually work. */
+@import '@fontsource-variable/inter/index.css';
+
 *,
 *::before,
 *::after {
@@ -6,13 +12,16 @@
 
 body {
   margin: 0;
-  font-family: Inter, system-ui, -apple-system, sans-serif;
-  background: #f8fafc;
-  color: #1e293b;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  background: var(--bg);
+  color: var(--text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
   height: 100vh;
+  /* Slightly tightened default tracking — Inter is designed for it. */
+  letter-spacing: -0.006em;
 }
 
 #app {
@@ -21,19 +30,39 @@ body {
   flex-direction: column;
 }
 
+h1, h2, h3 {
+  letter-spacing: -0.025em;
+  font-weight: 620;
+}
+
+/* Counts must not jitter as digits change. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+button {
+  font-family: inherit;
+}
+
+/* Visible, consistent focus for keyboard users only. */
+:focus-visible {
+  outline: 2px solid var(--profile-1);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
 ::-webkit-scrollbar {
-  width: 5px;
+  width: 9px;
+  height: 9px;
 }
-
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
+  background: var(--border);
+  border-radius: var(--r-full);
+  border: 3px solid var(--surface);
 }
-
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--border-strong);
 }

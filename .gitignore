@@ -13,6 +13,9 @@ dist-ssr
 *.local
 .env
 
+# Cached Natural Earth download (13MB). Generated artefacts in src/data ARE committed.
+scripts/.cache
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

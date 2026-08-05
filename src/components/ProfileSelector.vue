@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useVisitedCountries } from '../composables/useVisitedCountries.js'
+import Avatar from './Avatar.vue'
 
 const { profiles, activeProfileId, setActiveProfile, updateProfileInfo } = useVisitedCountries()
 
@@ -19,68 +20,98 @@ function saveEdit() {
 </script>
 
 <template>
-  <div class="profile-selector">
+  <div class="selector">
     <button
       v-for="(profile, idx) in profiles"
       :key="profile.id"
-      class="profile-btn"
-      :class="[{ active: profile.id === activeProfileId }, idx === 0 ? 'color-p1' : 'color-p2']"
+      class="pill"
+      :class="[{ active: profile.id === activeProfileId }, idx === 0 ? 'p1' : 'p2']"
       @click="setActiveProfile(profile.id)"
       @dblclick.stop="startEdit(profile)"
+      :title="`${profile.name} — double-click to rename`"
     >
-      <span class="emoji">{{ profile.emoji }}</span>
-      <template v-if="editingId === profile.id">
-        <input v-model="editName" class="edit-input" @keyup.enter="saveEdit" @blur="saveEdit" @click.stop autofocus />
-      </template>
-      <template v-else>
-        <span class="name">{{ profile.name }}</span>
-      </template>
+      <Avatar :name="profile.name" :variant="idx === 0 ? 'p1' : 'p2'" :size="22"
+              :solid="profile.id === activeProfileId" />
+      <input
+        v-if="editingId === profile.id"
+        v-model="editName"
+        class="edit"
+        @keyup.enter="saveEdit"
+        @blur="saveEdit"
+        @click.stop
+        autofocus
+      />
+      <span v-else class="name">{{ profile.name }}</span>
     </button>
   </div>
 </template>
 
 <style scoped>
-.profile-selector { display: flex; gap: 0.4rem; }
+.selector {
+  display: flex;
+  gap: var(--s-1);
+}
 
-.profile-btn {
+.pill {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.3rem 0.75rem;
-  background: #f8fafc;
-  border: 2px solid #e2e8f0;
-  border-radius: 24px;
-  color: #64748b;
+  gap: 0.35rem;
+  padding: 0.26rem 0.6rem 0.26rem 0.4rem;
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  border-radius: var(--r-full);
+  color: var(--text-muted);
   cursor: pointer;
-  font-size: 0.82rem;
-  transition: all 0.2s ease;
+  font-size: 0.8rem;
+  font-weight: 550;
   white-space: nowrap;
+  letter-spacing: -0.008em;
+  transition: background var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out),
+    border-color var(--t-fast) var(--ease-out), transform var(--t-fast) var(--ease-out);
+}
+.pill:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.pill:active {
+  transform: scale(0.97);
 }
 
-.profile-btn:hover { background: #f1f5f9; color: #475569; }
+.pill.active.p1 {
+  border-color: var(--profile-1);
+  color: var(--profile-1-text);
+  background: var(--profile-1-soft);
+}
+.pill.active.p2 {
+  border-color: var(--profile-2);
+  color: var(--profile-2-text);
+  background: var(--profile-2-soft);
+}
 
-.profile-btn.active.color-p1 { border-color: #3b82f6; color: #2563eb; background: #eff6ff; }
-.profile-btn.active.color-p2 { border-color: #ec4899; color: #db2777; background: #fdf2f8; }
-
-.emoji { font-size: 1rem; }
-.name { font-weight: 600; }
-
-.edit-input {
-  background: transparent; border: none;
+.edit {
+  background: transparent;
+  border: none;
   border-bottom: 1px solid currentColor;
-  color: inherit; font-size: 0.82rem;
-  width: 70px; padding: 0; outline: none; font-weight: 600;
+  color: inherit;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 550;
+  width: 68px;
+  padding: 0;
+  outline: none;
 }
 
-/* Mobile: emoji-only compact pills */
 @media (max-width: 768px) {
-  .profile-btn {
-    padding: 0.3rem;
-    width: 36px; height: 36px;
-    border-radius: 50%;
+  .pill {
+    padding: 0;
+    width: 34px;
+    height: 34px;
+    border-radius: var(--r-full);
     justify-content: center;
   }
-  .name, .edit-input { display: none; }
-  .emoji { font-size: 1.1rem; }
+  .name,
+  .edit {
+    display: none;
+  }
 }
 </style>

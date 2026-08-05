@@ -46,6 +46,11 @@ export function clearVisits(profileId) {
   })
 }
 
+// Which countries have memories, with counts — drives the camera markers on the map.
+export function getMemoryCountries() {
+  return request('/memories')
+}
+
 export function getMemories(countryCode) {
   return request(`/memories/${countryCode}`)
 }

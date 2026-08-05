@@ -5,58 +5,130 @@ const props = defineProps({
   current: { type: Number, default: 0 },
   goal: { type: Number, default: 30 },
   label: { type: String, default: '' },
-  color: { type: String, default: '#3b82f6' },
+  color: { type: String, default: 'var(--profile-1)' },
 })
 
-const percentage = computed(() => Math.min(100, Math.round((props.current / props.goal) * 100)))
-const circumference = 2 * Math.PI * 38
-const dashOffset = computed(() => circumference - (percentage.value / 100) * circumference)
+const pct = computed(() => Math.min(100, (props.current / props.goal) * 100))
+const CIRC = 2 * Math.PI * 38
+const dashOffset = computed(() => CIRC - (pct.value / 100) * CIRC)
 const isComplete = computed(() => props.current >= props.goal)
+const remaining = computed(() => Math.max(0, props.goal - props.current))
 </script>
 
 <template>
-  <div class="goal-progress" :class="{ complete: isComplete }">
-    <svg class="ring" viewBox="0 0 84 84">
-      <circle class="ring-bg" cx="42" cy="42" r="38" />
-      <circle class="ring-fill" cx="42" cy="42" r="38"
-        :stroke="isComplete ? '#22c55e' : color"
-        :stroke-dasharray="circumference"
-        :stroke-dashoffset="dashOffset"
-      />
-    </svg>
-    <div class="ring-content">
-      <span class="ring-number">{{ current }}</span>
-      <span class="ring-slash">/{{ goal }}</span>
+  <!-- A stat card rather than a bare ring: the goal is the point of the whole app, so
+       it should read as a headline figure, not a decoration in the corner. -->
+  <div class="goal" :class="{ complete: isComplete }">
+    <div class="ring-wrap">
+      <svg class="ring" viewBox="0 0 84 84" aria-hidden="true">
+        <circle class="ring-bg" cx="42" cy="42" r="38" />
+        <circle
+          class="ring-fill"
+          cx="42" cy="42" r="38"
+          :stroke="isComplete ? 'var(--success)' : color"
+          :stroke-dasharray="CIRC"
+          :stroke-dashoffset="dashOffset"
+        />
+      </svg>
     </div>
-    <span class="ring-label" v-if="label">{{ label }}</span>
+
+    <div class="meta">
+      <span class="label">{{ label }}</span>
+      <span class="figure">
+        <strong>{{ current }}</strong><span class="of">/{{ goal }}</span>
+        <span class="sub" v-if="!isComplete">· {{ remaining }} to go</span>
+        <span class="sub done" v-else>· reached</span>
+      </span>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.goal-progress {
+.goal {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.45rem 1rem 0.45rem 0.5rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-lg);
+  flex-shrink: 0;
+}
+.goal.complete {
+  border-color: var(--success);
+  background: color-mix(in oklab, var(--success) 10%, var(--surface));
+}
+
+.ring-wrap {
+  position: relative;
+  width: 50px;
+  height: 50px;
+  flex-shrink: 0;
+}
+.ring {
+  width: 50px;
+  height: 50px;
+  transform: rotate(-90deg);
+}
+.ring-bg {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 9;
+}
+.ring-fill {
+  fill: none;
+  stroke-width: 9;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 700ms var(--ease-out), stroke var(--t-base) var(--ease-out);
+}
+
+.meta {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 0.15rem;
-  position: relative;
+  gap: 1px;
 }
 
-.ring { width: 50px; height: 50px; transform: rotate(-90deg); }
-.ring-bg { fill: none; stroke: #e2e8f0; stroke-width: 4; }
-.ring-fill { fill: none; stroke-width: 4; stroke-linecap: round; transition: stroke-dashoffset 0.6s ease, stroke 0.3s ease; }
-
-.ring-content {
-  position: absolute;
-  top: 0; left: 0;
-  width: 50px; height: 50px;
+/* Tabular figures so the number never shifts as it counts up. */
+.figure {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: baseline;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+  white-space: nowrap;
+}
+.figure strong {
+  font-size: 1.72rem;
+  font-weight: 680;
+  color: var(--text);
+}
+.of {
+  font-size: 1rem;
+  color: var(--text-faint);
+  font-weight: 500;
 }
 
-.ring-number { font-size: 0.9rem; font-weight: 700; color: #1e293b; }
-.ring-slash { font-size: 0.55rem; color: #94a3b8; font-weight: 500; }
-.ring-label { font-size: 0.6rem; color: #94a3b8; white-space: nowrap; }
-.complete .ring-number { color: #16a34a; }
-.complete .ring-label { color: #16a34a; }
+.label {
+  font-size: 0.75rem;
+  font-weight: 640;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.sub {
+  margin-left: 0.4rem;
+  font-size: 0.78rem;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+.sub.done { color: var(--success); font-weight: 600; }
+
+.complete .figure strong { color: var(--success); }
+.complete .label { color: var(--success); }
+
+@media (max-width: 900px) {
+  .label, .sub { display: none; }
+  .goal { padding: 0.3rem 0.4rem; gap: 0.4rem; }
+}
 </style>

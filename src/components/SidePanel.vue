@@ -1,9 +1,14 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { Search, X, Camera, Crosshair, Check, ChevronDown } from 'lucide-vue-next'
 import { useVisitedCountries } from '../composables/useVisitedCountries.js'
-import { countryFlag } from '../utils/flags.js'
-import { continents, continentMap, countryToContinent } from '../data/continents.js'
+import FlagIcon from './FlagIcon.vue'
 import CountryMemories from './CountryMemories.vue'
+
+// This panel does exactly one job: find a place and mark it. Traveller counts,
+// continent breakdowns and milestones live in StatsPanel, opened from the header —
+// as permanent fixtures they were ~40 pieces of information sitting above a list you
+// were trying to scan, five of them reading zero.
 
 const props = defineProps({
   mapRef: { type: Object, default: null },
@@ -12,143 +17,187 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 const {
-  allCountries, profiles, activeProfileId, visits,
-  toggleCountry, isVisitedBy, visitedCount,
+  entities, profiles, activeProfileId,
+  toggleCountry, isVisitedBy, visitStateFor, totalEntities,
 } = useVisitedCountries()
 
 const search = ref('')
-const activeContinent = ref(null)
-const filter = ref('all')
+// Defaults to your own places. "All" meant 239 rows of which ~96% were grey noise.
+const filter = ref('visited')
+const collapsed = ref(new Set())
 
 const p1Id = computed(() => profiles.value[0]?.id)
 const p2Id = computed(() => profiles.value[1]?.id)
 
-function toggleContinent(key) {
-  activeContinent.value = activeContinent.value === key ? null : key
-}
+const CONTINENT_ORDER = [
+  ['Europe', 'Europe'],
+  ['Asia', 'Asia'],
+  ['Africa', 'Africa'],
+  ['North America', 'N. America'],
+  ['South America', 'S. America'],
+  ['Oceania', 'Oceania'],
+  ['Antarctica', 'Antarctica'],
+]
 
-function continentStats(key) {
-  const codes = continentMap[key] || []
-  const pid = activeProfileId.value
-  const visited = codes.filter(c => isVisitedBy(pid, c)).length
-  return { visited, total: codes.length }
-}
+const FILTERS = [
+  { key: 'visited', label: 'Visited' },
+  { key: 'all', label: 'All' },
+  { key: 'unvisited', label: 'Not visited' },
+]
 
-const filteredCountries = computed(() => {
-  const q = search.value.toLowerCase()
+const filtered = computed(() => {
+  const q = search.value.trim().toLowerCase()
   const pid = activeProfileId.value
-  return allCountries.filter(c => {
-    if (q && !c.name.toLowerCase().includes(q)) return false
-    if (filter.value === 'visited' && !isVisitedBy(pid, c.id)) return false
-    if (filter.value === 'unvisited' && isVisitedBy(pid, c.id)) return false
-    if (activeContinent.value && countryToContinent[c.id] !== activeContinent.value) return false
+  return entities.filter(e => {
+    if (q && !e.name.toLowerCase().includes(q) && !e.nameLong.toLowerCase().includes(q)) return false
+    if (filter.value === 'visited' && !isVisitedBy(pid, e.code)) return false
+    if (filter.value === 'unvisited' && isVisitedBy(pid, e.code)) return false
     return true
   })
 })
 
-function getStatus(countryId) {
-  const byP1 = isVisitedBy(p1Id.value, countryId)
-  const byP2 = isVisitedBy(p2Id.value, countryId)
-  if (byP1 && byP2) return 'both'
-  if (byP1) return 'p1'
-  if (byP2) return 'p2'
-  return 'none'
-}
-
-function handleCountryClick(country) {
-  toggleCountry(country.id)
-}
-
-function flyTo(e, country) {
-  e.stopPropagation()
-  if (props.mapRef?.flyToCountry) {
-    props.mapRef.flyToCountry(country.id)
+const grouped = computed(() => {
+  const buckets = new Map()
+  for (const e of filtered.value) {
+    if (!buckets.has(e.continent)) buckets.set(e.continent, [])
+    buckets.get(e.continent).push(e)
   }
+  return CONTINENT_ORDER.filter(([k]) => buckets.has(k)).map(([k, label]) => ({
+    continent: k,
+    label,
+    items: buckets.get(k),
+  }))
+})
+
+// Clicking a group header collapses it. This replaces the old grid of seven continent
+// cards: same navigation, in a header that had to exist anyway.
+function toggleGroup(key) {
+  const next = new Set(collapsed.value)
+  next.has(key) ? next.delete(key) : next.add(key)
+  collapsed.value = next
+}
+
+const activeName = computed(
+  () => profiles.value.find(p => p.id === activeProfileId.value)?.name || '',
+)
+
+// Same rule as the map: if the active traveller has been here, open the memories;
+// otherwise mark it. Previously a row click called toggleCountry unconditionally, so
+// clicking a place you'd already visited silently DELETED the visit — the exact
+// opposite of what the same click does on the map, and with no undo.
+function handleRowClick(entity) {
+  if (isVisitedBy(activeProfileId.value, entity.code)) memoriesCountry.value = entity
+  else toggleCountry(entity.code)
+}
+
+// `/` focuses the search, the way it works in most tools with a list like this.
+const searchEl = ref(null)
+
+function onKeydown(e) {
+  if (e.key !== '/' || e.metaKey || e.ctrlKey) return
+  const tag = document.activeElement?.tagName
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return
+  e.preventDefault()
+  searchEl.value?.focus()
+}
+
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onUnmounted(() => window.removeEventListener('keydown', onKeydown))
+
+function flyTo(e, entity) {
+  e.stopPropagation()
+  props.mapRef?.flyToCountry?.(entity.code)
   emit('close')
 }
 
 const memoriesCountry = ref(null)
 
-function openMemories(e, country) {
+function openMemories(e, entity) {
   e.stopPropagation()
-  memoriesCountry.value = country
+  memoriesCountry.value = entity
 }
 </script>
 
 <template>
   <aside class="panel">
-    <!-- Close button (mobile only) -->
-    <button class="mobile-close" @click="emit('close')">&#x2715;</button>
+    <button class="mobile-close" @click="emit('close')" aria-label="Close menu">
+      <X :size="18" />
+    </button>
 
-    <!-- Stats header -->
-    <div class="panel-header">
-      <span class="count">{{ visitedCount }}</span>
-      <span class="label">countries explored</span>
-    </div>
-
-    <!-- Continent cards -->
-    <div class="continent-grid">
-      <button
-        v-for="cont in continents"
-        :key="cont.key"
-        class="continent-card"
-        :class="{ active: activeContinent === cont.key }"
-        @click="toggleContinent(cont.key)"
-      >
-        <div class="cont-top">
-          <span class="cont-emoji">{{ cont.emoji }}</span>
-          <span class="cont-stat"><strong>{{ continentStats(cont.key).visited }}</strong>/{{ continentStats(cont.key).total }}</span>
-        </div>
-        <span class="cont-name">{{ cont.name }}</span>
-        <div class="cont-bar" :style="{ '--pct': (continentStats(cont.key).visited / continentStats(cont.key).total * 100) + '%', '--color': cont.color }"></div>
-      </button>
-    </div>
-
-    <!-- Search -->
-    <div class="search-wrap">
-      <svg class="search-icon" width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5">
-        <circle cx="6" cy="6" r="4.5" /><path d="M9.5 9.5L13 13" />
-      </svg>
-      <input v-model="search" type="text" placeholder="Search countries..." class="search-input" />
-    </div>
-
-    <!-- Filters -->
-    <div class="filter-row">
-      <button v-for="f in [{key:'all',label:'All'},{key:'visited',label:'Visited'},{key:'unvisited',label:'Bucket list'}]"
-        :key="f.key" class="filter-btn" :class="{active: filter === f.key}" @click="filter = f.key">
-        {{ f.label }}
-      </button>
-      <span class="filter-count">{{ filteredCountries.length }}</span>
-    </div>
-
-    <!-- Country list -->
-    <ul class="country-list">
-      <li
-        v-for="country in filteredCountries"
-        :key="country.id"
-        class="country-item"
-        :class="getStatus(country.id)"
-        @click="handleCountryClick(country)"
-      >
-        <span class="country-flag">{{ countryFlag(country.id) }}</span>
-        <span class="country-name">{{ country.name }}</span>
-        <div class="badges">
-          <span v-if="isVisitedBy(p1Id, country.id)" class="badge b-p1">&#10003;</span>
-          <span v-if="isVisitedBy(p2Id, country.id)" class="badge b-p2">&#10003;</span>
-        </div>
-        <button
-          v-if="getStatus(country.id) !== 'none'"
-          class="mem-btn"
-          @click="openMemories($event, country)"
-          title="Memories"
-        >&#128247;</button>
-        <button class="fly-btn" @click="flyTo($event, country)" title="Fly to">
-          <svg width="14" height="14" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5">
-            <circle cx="6" cy="6" r="4" /><circle cx="6" cy="6" r="1" fill="currentColor" />
-          </svg>
+    <div class="controls">
+      <div class="search">
+        <Search class="search-icon" :size="15" />
+        <input ref="searchEl" v-model="search" type="text"
+               :placeholder="`Search ${totalEntities} places\u2026  /`" />
+        <button v-if="search" class="search-clear" @click="search = ''" aria-label="Clear search">
+          <X :size="13" />
         </button>
-      </li>
-    </ul>
+      </div>
+
+      <div class="filters">
+        <button
+          v-for="f in FILTERS"
+          :key="f.key"
+          class="chip"
+          :class="{ active: filter === f.key }"
+          @click="filter = f.key"
+        >{{ f.label }}</button>
+        <span class="count">{{ filtered.length }}</span>
+      </div>
+    </div>
+
+    <div class="list">
+      <template v-for="group in grouped" :key="group.continent">
+        <button class="group-head" @click="toggleGroup(group.continent)">
+          <ChevronDown
+            class="chev"
+            :class="{ turned: collapsed.has(group.continent) }"
+            :size="12"
+            :stroke-width="2.5"
+          />
+          <span>{{ group.label }}</span>
+          <span class="group-n">{{ group.items.length }}</span>
+        </button>
+
+        <template v-if="!collapsed.has(group.continent)">
+          <div
+            v-for="entity in group.items"
+            :key="entity.code"
+            class="row"
+            :class="visitStateFor(entity.code)"
+            @click="handleRowClick(entity)"
+          >
+            <FlagIcon :code="entity.code" :size="25" />
+            <span class="row-name">{{ entity.name }}</span>
+
+            <span class="marks">
+              <span v-if="isVisitedBy(p1Id, entity.code)" class="mark m1"><Check :size="11" :stroke-width="3.5" /></span>
+              <span v-if="isVisitedBy(p2Id, entity.code)" class="mark m2"><Check :size="11" :stroke-width="3.5" /></span>
+            </span>
+
+            <button
+              v-if="visitStateFor(entity.code) !== 'none'"
+              class="icon-btn"
+              @click="openMemories($event, entity)"
+              title="Memories"
+            ><Camera :size="16" /></button>
+
+            <button class="icon-btn faint" @click="flyTo($event, entity)" title="Show on map">
+              <Crosshair :size="16" />
+            </button>
+          </div>
+        </template>
+      </template>
+
+      <p v-if="!filtered.length && search" class="empty">
+        Nothing matches &ldquo;{{ search }}&rdquo;.
+      </p>
+      <p v-else-if="!filtered.length && filter === 'visited'" class="empty">
+        No places for {{ activeName }} yet.<br />
+        <span class="dim">Click a country on the map, or switch to All.</span>
+      </p>
+      <p v-else-if="!filtered.length" class="empty">Nothing to show.</p>
+    </div>
 
     <CountryMemories
       v-if="memoriesCountry"
@@ -160,10 +209,10 @@ function openMemories(e, country) {
 
 <style scoped>
 .panel {
-  width: 370px;
-  min-width: 370px;
-  background: #ffffff;
-  border-right: 1px solid #e2e8f0;
+  width: 404px;
+  min-width: 404px;
+  background: var(--surface);
+  border-right: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -173,135 +222,190 @@ function openMemories(e, country) {
 .mobile-close {
   display: none;
   position: absolute;
-  top: 0.6rem; right: 0.6rem;
-  background: #f1f5f9; border: none;
-  color: #64748b; cursor: pointer;
-  font-size: 1.1rem;
-  width: 32px; height: 32px;
-  border-radius: 8px;
-  z-index: 2;
-}
-
-/* Header */
-.panel-header {
-  padding: 1rem 1rem 0.75rem;
-  border-bottom: 1px solid #f1f5f9;
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-}
-.count { font-size: 1.8rem; font-weight: 800; color: #1e293b; }
-.label { font-size: 0.95rem; color: #94a3b8; }
-
-/* Continent grid */
-.continent-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.4rem;
-  padding: 0.75rem 1rem;
-}
-
-.continent-card {
-  padding: 0.55rem 0.5rem 0.65rem;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
+  top: var(--s-3);
+  right: var(--s-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
   cursor: pointer;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-md);
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+}
+
+/* Controls */
+.controls {
+  padding: var(--s-4) var(--s-4) var(--s-3);
   display: flex;
   flex-direction: column;
+  gap: var(--s-2);
+}
+.search { position: relative; display: flex; align-items: center; }
+.search-icon {
+  position: absolute;
+  left: 0.65rem;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+.search input {
+  width: 100%;
+  padding: 0.62rem 2.1rem 0.62rem 2.2rem;
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  color: var(--text);
+  font-size: 0.98rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color var(--t-fast) var(--ease-out), background var(--t-fast) var(--ease-out);
+}
+.search input:focus { border-color: var(--profile-1); background: var(--surface); }
+.search input::placeholder { color: var(--text-faint); }
+.search-clear {
+  position: absolute;
+  right: 0.5rem;
+  display: flex;
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: var(--r-sm);
+}
+.search-clear:hover { color: var(--text); }
+
+.filters { display: flex; align-items: center; gap: var(--s-1); }
+.chip {
+  padding: 0.32rem 0.7rem;
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-sm);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--t-fast) var(--ease-out);
+}
+.chip:hover { border-color: var(--border); color: var(--text); }
+.chip.active {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--surface);
+}
+.count {
+  margin-left: auto;
+  font-size: 0.84rem;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* List */
+.list {
+  overflow-y: auto;
+  flex: 1;
+  padding: 0 var(--s-2) var(--s-4);
+}
+
+.group-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  width: 100%;
+  display: flex;
   align-items: center;
-  gap: 0.15rem;
-  transition: all 0.15s;
-  position: relative;
+  gap: 0.35rem;
+  padding: 0.5rem var(--s-2) 0.32rem;
+  background: var(--surface);
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 640;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-faint);
+  transition: color var(--t-fast) var(--ease-out);
+}
+.group-head:hover { color: var(--text-muted); }
+.chev {
+  transition: transform var(--t-base) var(--ease-out);
+  flex-shrink: 0;
+}
+.chev.turned { transform: rotate(-90deg); }
+.group-n {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  opacity: 0.75;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: 0.52rem var(--s-2);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 1rem;
+  transition: background var(--t-fast) var(--ease-out), color var(--t-fast) var(--ease-out);
+}
+.row:hover { background: var(--surface-2); color: var(--text); }
+.row.p1 { color: var(--profile-1-text); }
+.row.p2 { color: var(--profile-2-text); }
+.row.both { color: var(--profile-both-text); }
+
+.row-name {
+  flex: 1;
   overflow: hidden;
-}
-.continent-card:hover { border-color: #cbd5e1; background: #f1f5f9; }
-.continent-card.active { border-color: #3b82f6; background: #eff6ff; }
-
-.cont-top { display: flex; align-items: center; gap: 0.35rem; }
-.cont-emoji { font-size: 1.1rem; }
-.cont-stat { font-size: 0.85rem; color: #94a3b8; }
-.cont-stat strong { color: #1e293b; font-size: 1rem; }
-.cont-name { font-size: 0.65rem; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
-.cont-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: #f1f5f9; }
-.cont-bar::after {
-  content: ''; position: absolute; left: 0; top: 0; bottom: 0;
-  width: var(--pct, 0%); background: var(--color, #3b82f6);
-  border-radius: 0 2px 2px 0; transition: width 0.4s ease;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: -0.01em;
 }
 
-/* Search */
-.search-wrap { position: relative; padding: 0 1rem; margin-bottom: 0.5rem; }
-.search-icon { position: absolute; left: 1.55rem; top: 50%; transform: translateY(-50%); color: #94a3b8; pointer-events: none; }
-.search-input {
-  width: 100%; padding: 0.55rem 0.75rem 0.55rem 2.2rem;
-  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;
-  color: #1e293b; font-size: 0.95rem; outline: none; transition: border-color 0.2s;
-}
-.search-input:focus { border-color: #3b82f6; }
-.search-input::placeholder { color: #cbd5e1; }
-
-/* Filters */
-.filter-row {
-  display: flex; gap: 0.3rem; padding: 0 1rem 0.6rem; align-items: center;
-}
-.filter-btn {
-  padding: 0.35rem 0.7rem; background: transparent; border: 1px solid #e2e8f0;
-  border-radius: 8px; color: #94a3b8; font-size: 0.82rem; cursor: pointer;
-  transition: all 0.15s; font-weight: 500;
-}
-.filter-btn:hover { color: #64748b; border-color: #cbd5e1; }
-.filter-btn.active { background: #f1f5f9; color: #1e293b; border-color: #cbd5e1; }
-.filter-count { margin-left: auto; font-size: 0.8rem; color: #cbd5e1; }
-
-/* Country list */
-.country-list {
-  list-style: none; margin: 0; padding: 0;
-  overflow-y: auto; flex: 1;
-}
-
-.country-item {
-  display: flex; align-items: center; gap: 0.55rem;
-  padding: 0.5rem 1rem;
-  cursor: pointer; color: #475569; font-size: 0.95rem;
-  transition: all 0.1s;
-  border-left: 3px solid transparent;
-}
-.country-item:hover { background: #f8fafc; }
-.country-item.p1 { color: #2563eb; border-left-color: #3b82f6; }
-.country-item.p2 { color: #db2777; border-left-color: #ec4899; }
-.country-item.both { color: #7c3aed; border-left-color: #8b5cf6; }
-
-.country-flag { font-size: 1.15rem; width: 1.4rem; text-align: center; flex-shrink: 0; }
-.country-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-.badges { display: flex; gap: 0.2rem; flex-shrink: 0; }
-.badge {
-  width: 18px; height: 18px; border-radius: 50%;
-  font-size: 0.6rem; display: flex; align-items: center;
-  justify-content: center; font-weight: 700;
-}
-.b-p1 { background: #dbeafe; color: #2563eb; }
-.b-p2 { background: #fce7f3; color: #db2777; }
-
-.mem-btn {
-  background: none; border: none;
-  cursor: pointer; padding: 0; font-size: 0.85rem;
-  opacity: 0.35; transition: opacity 0.15s; flex-shrink: 0;
-}
-.mem-btn:hover { opacity: 0.8; }
-
-.fly-btn {
-  background: none; border: none; color: #e2e8f0;
-  cursor: pointer; padding: 0; line-height: 1;
-  transition: color 0.15s; display: flex; flex-shrink: 0;
-}
-.fly-btn:hover { color: #94a3b8; }
-
-/* Mobile: close button shown when inside mobile overlay */
-.mobile-panel .mobile-close {
+.marks { display: flex; gap: 3px; flex-shrink: 0; }
+.mark {
+  width: 17px;
+  height: 17px;
+  border-radius: var(--r-full);
   display: flex;
   align-items: center;
   justify-content: center;
+}
+.m1 { background: var(--profile-1-soft); color: var(--profile-1-text); }
+.m2 { background: var(--profile-2-soft); color: var(--profile-2-text); }
+
+.icon-btn {
+  display: flex;
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: var(--r-sm);
+  flex-shrink: 0;
+  transition: color var(--t-fast) var(--ease-out), background var(--t-fast) var(--ease-out),
+    opacity var(--t-fast) var(--ease-out);
+}
+.icon-btn:hover { color: var(--text); background: var(--surface-hover); }
+.icon-btn.faint { opacity: 0; }
+.row:hover .icon-btn.faint { opacity: 1; }
+
+.empty {
+  padding: var(--s-8) var(--s-4);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.94rem;
+  line-height: 1.6;
+}
+.empty .dim { color: var(--text-faint); font-size: 0.82rem; }
+
+.mobile-panel .mobile-close,
+.drawer .mobile-close {
+  display: flex;
 }
 </style>

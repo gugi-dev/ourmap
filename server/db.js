@@ -10,8 +10,8 @@ let useMemory = !dbUrl || !dbUrl.startsWith('postgres')
 
 const mem = {
   profiles: [
-    { id: 1, name: 'Traveler 1', emoji: '🧑', created_at: new Date().toISOString() },
-    { id: 2, name: 'Traveler 2', emoji: '👩', created_at: new Date().toISOString() },
+    { id: 1, name: 'Markic', emoji: '🧔', created_at: new Date().toISOString() },
+    { id: 2, name: 'Teic', emoji: '👩', created_at: new Date().toISOString() },
   ],
   visits: [],
   memories: [], // { id, country_code, image_url, caption, created_at }
@@ -138,7 +138,7 @@ export async function initDb() {
       created_at TIMESTAMPTZ DEFAULT NOW()
     );
     INSERT INTO profiles (id, name, emoji)
-    VALUES (1, 'Traveler 1', '🧑'), (2, 'Traveler 2', '👩')
+    VALUES (1, 'Markic', '🧔'), (2, 'Teic', '👩')
     ON CONFLICT (id) DO NOTHING;
   `)
   console.log('PostgreSQL connected and initialized')

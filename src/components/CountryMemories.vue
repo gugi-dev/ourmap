@@ -1,6 +1,6 @@
 <script setup>
 import { ref, watch } from 'vue'
-import { countryFlag } from '../utils/flags.js'
+import FlagIcon from './FlagIcon.vue'
 import { toDirectImageUrl } from '../utils/imageUrl.js'
 import { useVisitedCountries } from '../composables/useVisitedCountries.js'
 import * as api from '../api.js'
@@ -26,7 +26,7 @@ watch(() => props.country, async (c) => {
   loading.value = true
   imgErrors.value = new Set()
   try {
-    memories.value = await api.getMemories(c.id)
+    memories.value = await api.getMemories(c.code)
   } catch (e) {
     console.error('Failed to load memories:', e)
   } finally {
@@ -38,7 +38,7 @@ async function addMemory() {
   const url = toDirectImageUrl(newUrl.value.trim())
   if (!url) return
   try {
-    const m = await api.addMemory(props.country.id, url, newCaption.value.trim())
+    const m = await api.addMemory(props.country.code, url, newCaption.value.trim())
     memories.value.unshift(m)
     newUrl.value = ''
     newCaption.value = ''
@@ -63,7 +63,7 @@ function handleImgError(id) {
 }
 
 function handleUnvisit() {
-  toggleCountry(props.country.id)
+  toggleCountry(props.country.code)
   emit('close')
 }
 </script>
@@ -75,7 +75,7 @@ function handleUnvisit() {
         <!-- Header -->
         <div class="modal-header">
           <div class="modal-title">
-            <span class="modal-flag">{{ countryFlag(country.id) }}</span>
+            <FlagIcon :code="country.code" :size="28" />
             <h2>{{ country.name }}</h2>
           </div>
           <div class="modal-actions">
